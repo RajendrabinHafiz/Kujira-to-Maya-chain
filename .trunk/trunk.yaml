@@ -1,0 +1,43 @@
+version: 0.1
+plugins:
+  sources:
+    - id: trunk
+      ref: v0.0.15
+      uri: https://github.com/trunk-io/plugins
+actions:
+  enabled:
+    - trunk-cache-prune
+    - trunk-upgrade-available
+runtimes:
+  enabled:
+    - go@1.20.3
+    - node@16.14.2
+    - python@3.10.3
+cli:
+  version: 1.7.0
+lint:
+  enabled:
+    - black@23.3.0
+    - git-diff-check
+    - taplo@0.8.0
+    - black-py@23.3.0
+    - flake8@6.0.0
+      #- gitleaks@8.16.2
+    - gofmt@1.19.2
+    - golangci-lint@1.52.2
+    - hadolint@2.12.0
+    - isort@5.12.0
+    - markdownlint@0.33.0
+    - prettier@2.8.7
+    - shellcheck@0.9.0
+    - shfmt@3.5.0
+  ignore:
+    - linters: [ALL]
+      paths:
+        - "build/docker/Dockerfile"
+        # NOTE: Temporarily disabled to import Heimdall repo.
+        - "test/smoke"
+    - linters:
+        - prettier
+      paths:
+        - "test/fixtures/endpoints/auth/accounts/malformed.json"

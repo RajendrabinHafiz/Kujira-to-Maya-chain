@@ -1,0 +1,601 @@
+########################################################################################
+# Config
+########################################################################################
+
+version: "3.9"
+
+volumes:
+  cli:
+  mayanode:
+  mayanode-cat:
+  mayanode-dog:
+  mayanode-fox:
+  mayanode-pig:
+  bifrost:
+  bifrost-cat:
+  bifrost-dog:
+  bifrost-fox:
+  bifrost-pig:
+
+########################################################################################
+# Services
+########################################################################################
+
+services:
+  _mayachain: &mayachain-defaults
+    profiles:
+      - _
+    restart: unless-stopped
+    image: registry.gitlab.com/mayachain/mayanode:mocknet
+    build:
+      context: ../..
+      dockerfile: ./build/docker/Dockerfile
+      args:
+        TAG: mocknet
+    environment: &mayachain-environment
+      NET: mocknet
+      CHAIN_ID: mayachain
+      SIGNER_NAME: mayachain
+      SIGNER_PASSWD: 1passw0rd1
+    logging: &logging
+      driver: "json-file"
+      options:
+        max-size: "256m"
+        max-file: "3"
+
+  ######################################################################################
+  # BASEChain
+  ######################################################################################
+
+  # ------------------------------ cli ------------------------------
+
+  cli:
+    profiles:
+      - _
+    build:
+      context: ../..
+      dockerfile: ./build/docker/cli/Dockerfile
+    environment:
+      <<: *mayachain-environment
+      CHAIN_API: mayanode:1317
+      CHAIN_RPC: mayanode:26657
+      BINANCE_HOST: ${BINANCE_HOST:-http://binance:26660}
+      BTC_HOST: ${BTC_HOST:-bitcoin:18443}
+      DOGE_HOST: ${DOGE_HOST:-dogecoin:18332}
+      BCH_HOST: ${BCH_HOST:-bitcoin-cash:28443}
+      LTC_HOST: ${LTC_HOST:-litecoin:38443}
+      ETH_HOST: ${ETH_HOST:-http://ethereum:8545}
+      THOR_HOST: ${THOR_HOST:-http://thorchain:26657}
+      THOR_GRPC_HOST: ${THOR_GRPC_HOST:-thorchain:9090}
+      THOR_GRPC_TLS: false
+      AVAX_HOST: ${AVAX_HOST:-http://avalanche:9650/ext/bc/C/rpc}
+      GAIA_HOST: ${GAIA_HOST:-http://gaia:26657}
+      KUJI_HOST: ${KUJI_HOST:-http://kujira:26657}
+    entrypoint: /bin/bash
+    command:
+      - --init-file
+      - /cli/bashrc
+    working_dir: /root
+    volumes:
+      - cli:/root
+      - "./cli/:/cli"
+
+  # ------------------------------ mayanode ------------------------------
+
+  mayanode: &mayanode
+    <<: *mayachain-defaults
+    hostname: mayanode # required for genesis.sh
+    profiles:
+      - mayanode
+      - mocknet
+      - mocknet-cluster
+    depends_on:
+      - ethereum
+    environment: &mayanode-environment
+      <<: *mayachain-environment
+      NODES: 1
+      SEED: mayanode
+      THOR_BLOCK_TIME: ${THOR_BLOCK_TIME:-5s}
+      THORNODE_API_ENABLE: "true"
+      HARDFORK_BLOCK_HEIGHT: ${HARDFORK_BLOCK_HEIGHT:-}
+      NEW_GENESIS_TIME: ${NEW_GENESIS_TIME:-}
+    ports:
+      - 26657:26657
+      - 26656:26656
+      - 1317:1317
+      - 6060:6060
+    volumes:
+      - "../scripts:/docker/scripts"
+      - mayanode:/root/.mayanode
+    entrypoint: /docker/scripts/genesis.sh
+    command:
+      - mayanode
+      - start
+
+  # ------------------------------ bifrost ------------------------------
+
+  bifrost: &bifrost
+    <<: *mayachain-defaults
+    profiles:
+      - mayanode
+      - mocknet
+      - mocknet-cluster
+      - bifrost
+      - validator
+    depends_on:
+      - binance
+      - bitcoin
+      - bitcoin-cash
+      - dash1
+      - dogecoin
+      - ethereum
+      - litecoin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment: &bifrost-environment
+      <<: *mayachain-environment
+      CHAIN_API: mayanode:1317
+      CHAIN_RPC: mayanode:26657
+      MAYANODE_SERVICE_PORT_RPC: 26657
+      BINANCE_HOST: ${BINANCE_HOST:-http://binance:26660}
+      BTC_HOST: ${BTC_HOST:-bitcoin:18443}
+      DOGE_HOST: ${DOGE_HOST:-dogecoin:18332}
+      DASH_HOST: ${DASH_HOST:-dash1:19898}
+      BCH_HOST: ${BCH_HOST:-bitcoin-cash:28443}
+      LTC_HOST: ${LTC_HOST:-litecoin:38443}
+      ETH_HOST: ${ETH_HOST:-http://ethereum:8545}
+      THOR_HOST: ${THOR_HOST:-http://thorchain:26657}
+      THOR_GRPC_HOST: ${THOR_GRPC_HOST:-thorchain:9090}
+      THOR_GRPC_TLS: false
+      AVAX_HOST: ${AVAX_HOST:-http://avalanche:9650/ext/bc/C/rpc}
+      GAIA_HOST: ${GAIA_HOST:-http://gaia:26657}
+      GAIA_GRPC_HOST: ${GAIA_GRPC_HOST:-gaia:9090}
+      KUJI_HOST: ${KUJI_HOST:-http://kujira:26657}
+      KUJI_GRPC_HOST: ${KUJI_GRPC_HOST:-kujira:9090}
+      THOR_BLOCK_TIME: ${THOR_BLOCK_TIME:-5s}
+      BLOCK_SCANNER_BACKOFF: ${BLOCK_SCANNER_BACKOFF:-5s}
+      PEER: ${PEER:-}
+      BIFROST_METRICS_PPROF_ENABLED: "true"
+    ports:
+      - 5040:5040
+      - 6040:6040
+      - 9000:9000
+    entrypoint: /docker/scripts/bifrost.sh
+    volumes:
+      - "../scripts:/docker/scripts"
+      - bifrost:/var/data/bifrost
+      - mayanode:/root/.mayanode
+    command: ["bifrost", "-p"]
+
+  # ------------------------------ midgard ------------------------------
+
+  midgard:
+    profiles:
+      - midgard
+    depends_on:
+      - midgard-db
+      - mayanode
+    image: registry.gitlab.com/mayachain/midgard:develop
+    restart: unless-stopped
+    environment:
+      MIDGARD_THORCHAIN_THOR_NODE_URL: http://mayanode:1317/mayachain
+      MIDGARD_THORCHAIN_TENDERMINT_URL: http://mayanode:26657/websocket
+      MIDGARD_TIMESCALE_HOST: midgard-db
+      MIDGARD_THORCHAIN_LAST_CHAIN_BACKOFF: ${THOR_BLOCK_TIME:-5s}
+    ports:
+      - 8080:8080
+    logging: *logging
+
+  midgard-db:
+    profiles:
+      - midgard
+    image: timescale/timescaledb:2.2.0-pg13
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=midgard
+      - POSTGRES_PASSWORD=password
+    command: postgres -c 'max_connections=250'
+    logging: *logging
+
+  ######################################################################################
+  # BASEChain Cluster
+  ######################################################################################
+
+  # ------------------------------ mayanodes ------------------------------
+
+  mayanode-cat:
+    <<: *mayanode
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    ports: []
+    hostname: mayanode-cat
+    environment:
+      <<: *mayanode-environment
+      PEER: mayanode
+      SEED: mayanode-cat
+      SEEDS: mayanode,mayanode-fox,mayanode-pig
+      SIGNER_SEED_PHRASE: "cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat cat crawl"
+    volumes:
+      - "../scripts:/docker/scripts"
+      - mayanode-cat:/root/.mayanode
+    entrypoint: /docker/scripts/validator.sh
+
+  mayanode-dog:
+    <<: *mayanode
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    ports: []
+    hostname: mayanode-dog
+    environment:
+      <<: *mayanode-environment
+      PEER: mayanode
+      SEED: mayanode-dog
+      SEEDS: mayanode,mayanode-fox,mayanode-pig
+      SIGNER_SEED_PHRASE: "dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog dog fossil"
+    volumes:
+      - "../scripts:/docker/scripts"
+      - mayanode-dog:/root/.mayanode
+    entrypoint: /docker/scripts/validator.sh
+
+  mayanode-fox:
+    <<: *mayanode
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    ports: []
+    hostname: mayanode-fox
+    environment:
+      <<: *mayanode-environment
+      PEER: mayanode
+      SEED: mayanode-fox
+      SEEDS: mayanode,mayanode-cat,mayanode-pig
+      SIGNER_SEED_PHRASE: "fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox fox filter"
+    volumes:
+      - "../scripts:/docker/scripts"
+      - mayanode-fox:/root/.mayanode
+    entrypoint: /docker/scripts/validator.sh
+
+  mayanode-pig:
+    <<: *mayanode
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    ports: []
+    hostname: mayanode-pig
+    environment:
+      <<: *mayanode-environment
+      PEER: mayanode
+      SEED: mayanode-pig
+      SEEDS: mayanode,mayanode-cat,mayanode-fox
+      SIGNER_SEED_PHRASE: "pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig pig quick"
+    volumes:
+      - "../scripts:/docker/scripts"
+      - mayanode-pig:/root/.mayanode
+    entrypoint: /docker/scripts/validator.sh
+
+  # ------------------------------ bifrosts ------------------------------
+
+  bifrost-cat:
+    <<: *bifrost
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    environment:
+      <<: *bifrost-environment
+      PEER: bifrost
+      CHAIN_API: mayanode-cat:1317
+      CHAIN_RPC: mayanode-cat:26657
+    ports:
+      - 5040
+      - 6040
+    volumes:
+      - "../scripts:/docker/scripts"
+      - bifrost-cat:/var/data/bifrost
+      - mayanode-cat:/root/.mayanode
+    command: ["bifrost"]
+
+  bifrost-dog:
+    <<: *bifrost
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    environment:
+      <<: *bifrost-environment
+      PEER: bifrost
+      CHAIN_API: mayanode-dog:1317
+      CHAIN_RPC: mayanode-dog:26657
+    ports:
+      - 5040
+      - 6040
+    volumes:
+      - "../scripts:/docker/scripts"
+      - bifrost-dog:/var/data/bifrost
+      - mayanode-dog:/root/.mayanode
+    command: ["bifrost"]
+
+  bifrost-fox:
+    <<: *bifrost
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    environment:
+      <<: *bifrost-environment
+      PEER: bifrost
+      CHAIN_API: mayanode-fox:1317
+      CHAIN_RPC: mayanode-fox:26657
+    ports:
+      - 5040
+      - 6040
+    volumes:
+      - "../scripts:/docker/scripts"
+      - bifrost-fox:/var/data/bifrost
+      - mayanode-fox:/root/.mayanode
+    command: ["bifrost"]
+
+  bifrost-pig:
+    <<: *bifrost
+    profiles:
+      - mayanode-cluster
+      - mocknet-cluster
+    environment:
+      <<: *bifrost-environment
+      PEER: bifrost
+      CHAIN_API: mayanode-pig:1317
+      CHAIN_RPC: mayanode-pig:26657
+    ports:
+      - 5040
+      - 6040
+    volumes:
+      - "../scripts:/docker/scripts"
+      - bifrost-pig:/var/data/bifrost
+      - mayanode-pig:/root/.mayanode
+    command: ["bifrost"]
+
+  ######################################################################################
+  # Mock Clients
+  ######################################################################################
+
+  # ------------------------------ binance ------------------------------
+
+  binance:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/thorchain/bepswap/mock-binance
+    ports:
+      - 26660:26660
+
+  # ------------------------------ gaia ------------------------------
+
+  gaia:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/thorchain/devops/node-launcher:gaia-daemon-7.0.3
+    volumes:
+      - "./mocknet:/mocknet"
+      - "./mocknet/gaia/genesis.json:/root/.gaia/config/genesis.json"
+      - "./mocknet/gaia/node_key.json:/root/.gaia/config/node_key.json"
+      - "./mocknet/gaia/priv_validator_key.json:/root/.gaia/config/priv_validator_key.json"
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1s}
+    ports:
+      - "23357:26657"
+      - "9091:9090"
+      - "21317:1317"
+    command: /mocknet/init-gaia.sh
+
+  # ------------------------------ kuji ------------------------------
+
+  kuji:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/thorchain/devops/node-launcher:kuji-daemon-7.0.3
+    volumes:
+      - "./mocknet:/mocknet"
+      - "./mocknet/kuji/genesis.json:/root/.kuji/config/genesis.json"
+      - "./mocknet/kuji/node_key.json:/root/.kuji/config/node_key.json"
+      - "./mocknet/kuji/priv_validator_key.json:/root/.kuji/config/priv_validator_key.json"
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1s}
+    ports:
+      - "23357:26657"
+      - "9091:9090"
+      - "21317:1317"
+    command: /mocknet/init-kuji.sh
+
+  # ------------------------------ thorchain ------------------------------
+
+  thorchain:
+    image: registry.gitlab.com/mayachain/devops/node-launcher:thornode-daemon-mocknet-1.115.0
+    restart: unless-stopped
+    hostname: thorchain # required for genesis.sh
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    volumes:
+      - "./mocknet/thorchain:/mocknet"
+    environment:
+      NET: mocknet
+      CHAIN_ID: thorchain
+      NODES: 1
+      SEED: thorchain
+      THOR_BLOCK_TIME: 5s
+      THORNODE_API_ENABLE: "true"
+      SIGNER_NAME: thorchain
+      SIGNER_PASSWD: password
+    ports:
+      - 26659:26657
+      - 26658:26656
+      - 1318:1317
+      - 6061:6060
+      - 9090:9090
+    entrypoint: /mocknet/genesis.sh
+    command:
+      - thornode
+      - start
+      - --log_level
+      - info
+      - --log_format
+      - plain
+      - --rpc.laddr
+      - tcp://0.0.0.0:26657
+      - --p2p.laddr
+      - tcp://0.0.0.0:26656
+
+  # ------------------------------ bitcoin ------------------------------
+
+  bitcoin:
+    user: root
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/mayachain/devops/node-launcher:bitcoin-daemon-24.1
+    restart: unless-stopped
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    ports:
+      - 18443:18443
+      - 18444:18444
+    entrypoint: "/scripts/entrypoint-mock.sh"
+
+  # ------------------------------ bitcoin cash ------------------------------
+
+  bitcoin-cash:
+    user: root
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/mayachain/devops/node-launcher:bitcoin-cash-daemon-26.0.0
+    restart: unless-stopped
+    environment:
+      RPC_PORT: "28443"
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    ports:
+      - 28443:28443
+    entrypoint: "/scripts/entrypoint-mock.sh"
+
+  # ------------------------------ dogecoin ------------------------------
+
+  dogecoin:
+    user: root
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/mayachain/devops/node-launcher:dogecoin-daemon-1.14.6
+    restart: unless-stopped
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    ports:
+      - 18332:18332
+    entrypoint: "/scripts/entrypoint-mock.sh"
+
+  # ------------------------------ dash ------------------------------
+
+  dash1:
+    profiles:
+      - dash
+      - mocknet
+      - mocknet-cluster
+    container_name: dash1
+    hostname: dash1
+    image: registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-19.2.0
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    entrypoint: "/scripts/entrypoint-regtest-genesis.sh"
+    ports:
+      - "19898:19898"
+      - "28332:28332"
+
+  dash2:
+    profiles:
+      - dash
+      - mocknet
+      - mocknet-cluster
+    container_name: dash2
+    hostname: dash2
+    image: registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-19.2.0
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    entrypoint: "/scripts/entrypoint-regtest-masternode.sh"
+
+  dash3:
+    profiles:
+      - dash
+      - mocknet
+      - mocknet-cluster
+    container_name: dash3
+    hostname: dash3
+    image: registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-19.2.0
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    entrypoint: "/scripts/entrypoint-regtest-masternode.sh"
+
+  dash4:
+    profiles:
+      - dash
+      - mocknet
+      - mocknet-cluster
+    container_name: dash4
+    hostname: dash4
+    image: registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-19.2.0
+    environment:
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    entrypoint: "/scripts/entrypoint-regtest-masternode.sh"
+
+  # ------------------------------ ethereum ------------------------------
+
+  ethereum:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: ethereum/client-go:v1.10.26
+    restart: unless-stopped
+    environment:
+      ETH_BLOCK_TIME: ${ETH_BLOCK_TIME:-5}
+    ports:
+      - 8545:8545
+      - 30301:30301
+      - 30303:30303
+    volumes:
+      - "../scripts:/docker/scripts"
+    entrypoint: /docker/scripts/eth/start-mock.sh
+
+  # ------------------------------ litecoin ------------------------------
+
+  litecoin:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    image: registry.gitlab.com/mayachain/devops/node-launcher:litecoin-daemon-0.21.1rc1 # 0.21.1rc1 is the version can be used with mocknet, 0.21.2 will fail with mocknet at block height 431
+    restart: unless-stopped
+    environment:
+      RPC_PORT: "38443"
+      BLOCK_TIME: ${BLOCK_TIME:-1}
+    ports:
+      - 38443:38443
+    entrypoint: "/scripts/entrypoint-mock.sh"
+
+  # ------------------------------ avalanche ------------------------------
+
+  avalanche:
+    profiles:
+      - mocknet
+      - mocknet-cluster
+    restart: unless-stopped
+    image: registry.gitlab.com/mayachain/devops/node-launcher:avalanche-daemon-1.9.9
+    volumes:
+      - "./mocknet/avax:/mocknet"
+    command:
+      - ./avalanchego
+      - --network-id=local
+      - --staking-enabled=false
+      - --http-host=
+      - --chain-config-dir=/mocknet/configs
+    ports:
+      - 9650:9650
+    environment:
+      RPC_PORT: "9650"

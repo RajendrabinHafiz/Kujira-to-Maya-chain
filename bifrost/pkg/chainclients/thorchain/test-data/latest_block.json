@@ -1,0 +1,62 @@
+{
+  "block_id": {
+    "hash": "847AC84E9219723DCFDC960C60D140A03B7B1DF4DE6F3056322BF9B2F8ABC063",
+    "parts": {
+      "total": 1,
+      "hash": "B16FD7CFC7AF7E7C7694471AE5F658CC74C45681B2ED29A68C0D5D914ED7F424"
+    }
+  },
+  "block": {
+    "header": {
+      "version": {
+        "block": "11"
+      },
+      "chain_id": "thorchain",
+      "height": "70",
+      "time": "2022-09-20T16:12:22.496680912Z",
+      "last_block_id": {
+        "hash": "A2ACBFDA74AFE3F57E6C905AB68533FB5DAFB88298951E2F1DE58F7F76045C70",
+        "parts": {
+          "total": 1,
+          "hash": "BBD5B567F6174BFC3E5074FA266F6F138E47A591929C7019F2975DBFE376B421"
+        }
+      },
+      "last_commit_hash": "8297274683E28F4132646E14939E26F91459B54EC2D408455B715E4BAC18657A",
+      "data_hash": "25D9837CF04AB8560AAD24D5E5E5B297FFB6BB16FED75DBEBF2152D0E0790A1C",
+      "validators_hash": "8F5381EB9C02E232F35A3AF78847ED8200B15E1D4AA92AE871D1D4FCE75DA232",
+      "next_validators_hash": "8F5381EB9C02E232F35A3AF78847ED8200B15E1D4AA92AE871D1D4FCE75DA232",
+      "consensus_hash": "048091BC7DDC283F77BFBF91D73C44DA58C3DF8A9CBC867405D8B7F3DAADA22F",
+      "app_hash": "CB2F733736DE4B248D3BE7EED59857556257E3E9CC478AC093665E8978183E13",
+      "last_results_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "evidence_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "proposer_address": "879567A78E5940AF26843F69661712BA6DBD4CC0"
+    },
+    "data": {
+      "txs": [
+        "Ck0KSwoOL3R5cGVzLk1zZ1NlbmQSOQoU5xsDhaVQJzA/jXPGFD4CCjEP4KESFAWPg8Ej2nb12niDxGzxeDsps0QyGgsKBHJ1bmUSAzEwMBJYClAKRgofL2Nvc21vcy5jcnlwdG8uc2VjcDI1NmsxLlB1YktleRIjCiEDv2abBBHTM1omC/IFnKjWDd4rFRBOUg1GU0lNQUJHFSMSBAoCCAEYBhIEEMCaDBpA0lWc57c3Cfmc514cGr7wjYi5ijns0QQOt4Z8Jd5SwMMKIJTwnGmmg0U63pZ7ZJnUSGqFoDtb5+9zgOQ6V2irlw=="
+      ]
+    },
+    "evidence": {
+      "evidence": null
+    },
+    "last_commit": {
+      "height": "69",
+      "round": 0,
+      "block_id": {
+        "hash": "A2ACBFDA74AFE3F57E6C905AB68533FB5DAFB88298951E2F1DE58F7F76045C70",
+        "parts": {
+          "total": 1,
+          "hash": "BBD5B567F6174BFC3E5074FA266F6F138E47A591929C7019F2975DBFE376B421"
+        }
+      },
+      "signatures": [
+        {
+          "block_id_flag": 2,
+          "validator_address": "879567A78E5940AF26843F69661712BA6DBD4CC0",
+          "timestamp": "2022-09-20T16:12:22.496680912Z",
+          "signature": "5ejBEkFO71okvCIquFJ8JNya//w6txOgiO8uF5BYYhxHFQBiTm4uJLM27TsFuIeSBy13b3dCp55SmdUkaZFcCA=="
+        }
+      ]
+    }
+  }
+}
